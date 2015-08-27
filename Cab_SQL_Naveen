@@ -1,0 +1,104 @@
+CREATE TABLE CAB_MASTER
+(
+	CAB_ID varchar(4000) NOT NULL PRIMARY KEY,
+	DRIVER_NAME varchar(4000) NOT NULL,
+	CAPACITY int NOT NULL
+);
+
+INSERT INTO CAB_MASTER values('TN071234','D1',4);
+INSERT INTO CAB_MASTER values('TN072234','D2',8);
+INSERT INTO CAB_MASTER values('TN073234','D3',4);
+INSERT INTO CAB_MASTER values('TN074234','D6',8);
+INSERT INTO CAB_MASTER values('TN075234','D4',8);
+INSERT INTO CAB_MASTER values('TN076234','D7',8);
+
+CREATE TABLE EMP_MASTER
+(
+	EMP_ID int NOT NULL PRIMARY KEY,
+	EMP_NAME varchar(4000) NOT NULL,
+	EMP_phone varchar(4000) NOT NULL,	
+);
+
+INSERT INTO EMP_MASTER values(1234,'E1','9840088877');
+INSERT INTO EMP_MASTER values(2234,'E2','9840088877');
+INSERT INTO EMP_MASTER values(3234,'E3','9840088877');
+INSERT INTO EMP_MASTER values(4234,'E4','9840088877');
+INSERT INTO EMP_MASTER values(5234,'E5','9840088877');
+INSERT INTO EMP_MASTER values(6234,'E6','9840088877');
+INSERT INTO EMP_MASTER values(7234,'E7','9840088877');
+
+CREATE TABLE CAB_MOVEMENT_DETAILS
+(
+  CAB_ID varchar(4000) NOT NULL,
+  ARRIVED char(1) NULL,
+  DEPARTED char(1) NULL,
+  ARRIVAL_TIME datetime,
+  DEPATURE_TIME datetime,
+  CAB_QUEUE int IDENTITY(1,1),
+);
+
+CREATE TABLE EMP_BOOKING
+(
+  ID int NOT NULL IDENTITY(1,1) PRIMARY KEY,
+  EMP_ID int NOT NULL,
+  EMP_Route int NULL,
+  Emp_Time_Slot  varchar(4000) NULL,
+  Emp_waiting_time datetime NULL,
+  Active_waiting_time datetime NULL,
+  Booking_Time datetime NULL     
+);
+
+CREATE TABLE CAB_ALLOTMENT
+(
+  EMP_ID int NOT NULL,
+  EMP_Route int NULL,
+  Route_Queue int NULL,  
+  CAB_ID varchar(4000),
+  ALLOTMENT_TIME datetime
+ );
+ ---------------------------------
+ /*
+exec usp_update_cab_movement_details 'TN071234','Y',NULL
+exec usp_update_cab_movement_details 'TN071234',NULL,'Y'
+*/
+alter procedure usp_update_cab_movement_details
+(
+  @CAB_ID varchar(4000) ,
+  @ARRIVED char(1)= NULL,
+  @DEPARTED char(1) = NULL,
+  @ARRIVAL_TIME datetime = NULL,
+  @DEPATURE_TIME datetime = NULL
+)
+as
+begin
+	if @ARRIVED = 'Y'
+	begin
+		insert into CAB_MOVEMENT_DETAILS
+		(
+		CAB_ID,
+		ARRIVED,
+		DEPARTED,
+		ARRIVAL_TIME,
+		DEPATURE_TIME
+		)
+		values
+		(
+		@CAB_ID,
+		@ARRIVED,
+		NULL,
+		GETDATE(),
+		NULL
+		)
+	end
+	else if @DEPARTED = 'Y'
+	begin
+		update	CAB_MOVEMENT_DETAILS 
+		set	DEPARTED = 'Y',
+			DEPATURE_TIME = GETDATE()
+		WHERE	DEPARTED is null
+		and	CAB_ID =@CAB_ID 			
+		
+	end
+end
+GO
+
