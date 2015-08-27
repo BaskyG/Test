@@ -45,7 +45,8 @@ CREATE TABLE EMP_BOOKING
   Emp_Time_Slot  varchar(4000) NULL,
   Emp_waiting_time datetime NULL,
   Active_waiting_time datetime NULL,
-  Booking_Time datetime NULL     
+  Booking_Time datetime NULL,
+  Allotment_Status char(1) NULL 
 );
 
 CREATE TABLE CAB_ALLOTMENT
@@ -101,4 +102,78 @@ begin
 	end
 end
 GO
-
+/*
+exec usp_employee_cab_booking '1234','1','8-9'
+exec usp_employee_cab_booking '2234','2','9-10'
+*/
+create proc usp_employee_cab_booking
+(
+  
+  @EMP_ID int,
+  @EMP_Route int ,
+  @Emp_Time_Slot  varchar(4000) 
+)
+as
+begin
+	insert into EMP_BOOKING
+	(
+	EMP_ID,
+	EMP_Route,
+	Emp_Time_Slot,
+	Booking_Time	
+	)
+	values
+	(
+	@EMP_ID,
+	@EMP_Route,
+	@Emp_Time_Slot,
+	GETDATE() 
+	)
+end
+go
+CREATE PROC USP_CAB_ALLOCATION
+AS
+BEGIN
+	DECLARE @CAB_ID VARCHAR(4000),
+		@CAPACITY INT
+	
+	IF EXISTS(SELECT 'X' FROM EMP_BOOKING WHERE ALLOTMENT_STATUS IS NULL)
+	BEGIN
+		IF EXISTS(SELECT 'X' FROM CAB_MOVEMENT_DETAILS WHERE ARRIVED = 'Y' AND DEPARTED IS NULL)
+		BEGIN
+			SELECT	@CAB_ID= A.CAB_ID,
+				@CAPACITY =  B.CAPACITY
+			FROM	CAB_MOVEMENT_DETAILS A
+			INNER JOIN
+				CAB_MASTER B
+				ON A.CAB_ID = B.CAB_ID 
+			WHERE	ARRIVED = 'Y' 
+			AND	DEPARTED IS NULL
+						 
+			INSERT INTO CAB_ALLOTMENT
+			(
+			EMP_ID,
+			EMP_ROUTE,
+			ROUTE_QUEUE,
+			CAB_ID,
+			ALLOTMENT_TIME
+			)
+			SELECT 
+				EMP_ID,
+				EMP_ROUTE,
+				ROW_NUMBER() OVER(PARTITION BY EMP_ROUTE ORDER BY EMP_ID DESC),
+				@CAB_ID,
+				GETDATE()
+				FROM EMP_BOOKING
+			WHERE	ALLOTMENT_STATUS IS NULL
+			
+			UPDATE	E
+			SET	ALLOTMENT_STATUS = 'Y'
+			FROM	EMP_BOOKING E 
+			JOIN	CAB_ALLOTMENT C
+				ON E.EMP_ID = C.EMP_ID
+				AND E.EMP_ROUTE = C.EMP_ROUTE
+			WHERE ALLOTMENT_TIME IS NOT NULL
+		END
+	END
+END
