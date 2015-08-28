@@ -1,0 +1,180 @@
+CREATE DATABASE VdsiCab;
+USE VdsiCab;
+
+CREATE TABLE CAB_MASTER
+(
+	CAB_ID varchar(400) NOT NULL PRIMARY KEY,
+	DRIVER_NAME varchar(400) NOT NULL,
+	CAPACITY int NOT NULL
+);
+
+INSERT INTO CAB_MASTER values('TN071234','D1',4);
+INSERT INTO CAB_MASTER values('TN072234','D2',8);
+INSERT INTO CAB_MASTER values('TN073234','D3',4);
+INSERT INTO CAB_MASTER values('TN074234','D6',8);
+INSERT INTO CAB_MASTER values('TN075234','D4',8);
+INSERT INTO CAB_MASTER values('TN076234','D7',8);
+
+CREATE TABLE EMP_MASTER
+(
+	EMP_ID int NOT NULL PRIMARY KEY,
+	EMP_NAME varchar(400) NOT NULL,
+	EMP_phone varchar(400) NOT NULL,	
+);
+
+INSERT INTO EMP_MASTER values(1234,'E1','9840088877');
+INSERT INTO EMP_MASTER values(2234,'E2','9840088877');
+INSERT INTO EMP_MASTER values(3234,'E3','9840088877');
+INSERT INTO EMP_MASTER values(4234,'E4','9840088877');
+INSERT INTO EMP_MASTER values(5234,'E5','9840088877');
+INSERT INTO EMP_MASTER values(6234,'E6','9840088877');
+INSERT INTO EMP_MASTER values(7234,'E7','9840088877');
+
+CREATE TABLE CAB_MOVEMENT_DETAILS
+(
+  CAB_ID varchar(4000) NOT NULL,
+  ARRIVED char(1) NULL,
+  DEPARTED char(1) NULL,
+  ARRIVAL_TIME datetime,
+  DEPATURE_TIME datetime,
+  CAB_QUEUE int IDENTITY(1,1),
+);
+
+CREATE TABLE EMP_BOOKING
+(
+  ID int NOT NULL IDENTITY(1,1) PRIMARY KEY,
+  EMP_ID int NOT NULL,
+  EMP_Route int NULL,
+  Emp_Time_Slot  varchar(4000) NULL,
+  Emp_waiting_time datetime NULL,
+  Active_waiting_time datetime NULL,
+  Booking_Time datetime NULL,
+  Allotment_Status char(1) NULL 
+);
+
+CREATE TABLE CAB_ALLOTMENT
+(
+  EMP_ID int NOT NULL,
+  EMP_Route int NULL,
+  Route_Queue int NULL,  
+  CAB_ID varchar(4000),
+  ALLOTMENT_TIME datetime
+ );
+ ---------------------------------
+ /*
+exec usp_update_cab_movement_details 'TN071234','Y',NULL
+exec usp_update_cab_movement_details 'TN071234',NULL,'Y'
+*/
+CREATE procedure usp_update_cab_movement_details
+(
+  @CAB_ID varchar(4000) ,
+  @ARRIVED char(1)= NULL,
+  @DEPARTED char(1) = NULL
+)
+as
+begin
+	if @ARRIVED = 'Y'
+	begin
+		insert into CAB_MOVEMENT_DETAILS
+		(
+		CAB_ID,
+		ARRIVED,
+		DEPARTED,
+		ARRIVAL_TIME,
+		DEPATURE_TIME
+		)
+		values
+		(
+		@CAB_ID,
+		@ARRIVED,
+		NULL,
+		GETDATE(),
+		NULL
+		)
+	end
+	else if @DEPARTED = 'Y'
+	begin
+		update	CAB_MOVEMENT_DETAILS 
+		set	DEPARTED = 'Y',
+			DEPATURE_TIME = GETDATE()
+		WHERE	DEPARTED is null
+		and	CAB_ID =@CAB_ID 			
+		
+	end
+end
+GO
+/*
+exec usp_employee_cab_booking '1234','1','8-9'
+exec usp_employee_cab_booking '2234','2','9-10'
+*/
+create proc usp_employee_cab_booking
+(
+  
+  @EMP_ID int,
+  @EMP_Route int ,
+  @Emp_Time_Slot  varchar(4000) 
+)
+as
+begin
+	insert into EMP_BOOKING
+	(
+	EMP_ID,
+	EMP_Route,
+	Emp_Time_Slot,
+	Booking_Time	
+	)
+	values
+	(
+	@EMP_ID,
+	@EMP_Route,
+	@Emp_Time_Slot,
+	GETDATE() 
+	)
+end
+go
+CREATE PROC USP_CAB_ALLOCATION
+AS
+BEGIN
+	DECLARE @CAB_ID VARCHAR(4000),
+		@CAPACITY INT
+	
+	IF EXISTS(SELECT 'X' FROM EMP_BOOKING WHERE ALLOTMENT_STATUS IS NULL)
+	BEGIN
+		IF EXISTS(SELECT 'X' FROM CAB_MOVEMENT_DETAILS WHERE ARRIVED = 'Y' AND DEPARTED IS NULL)
+		BEGIN
+			SELECT	@CAB_ID= A.CAB_ID,
+				@CAPACITY =  B.CAPACITY
+			FROM	CAB_MOVEMENT_DETAILS A
+			INNER JOIN
+				CAB_MASTER B
+				ON A.CAB_ID = B.CAB_ID 
+			WHERE	ARRIVED = 'Y' 
+			AND	DEPARTED IS NULL
+						 
+			INSERT INTO CAB_ALLOTMENT
+			(
+			EMP_ID,
+			EMP_ROUTE,
+			ROUTE_QUEUE,
+			CAB_ID,
+			ALLOTMENT_TIME
+			)
+			SELECT  TOP (@CAPACITY)
+				EMP_ID,
+				EMP_ROUTE,
+				ROW_NUMBER() OVER(PARTITION BY EMP_ROUTE ORDER BY EMP_ID DESC),
+				@CAB_ID,
+				GETDATE()
+				FROM EMP_BOOKING
+			WHERE	ALLOTMENT_STATUS IS NULL
+			
+			UPDATE	E
+			SET	ALLOTMENT_STATUS = 'Y'
+			FROM	EMP_BOOKING E 
+			JOIN	CAB_ALLOTMENT C
+				ON E.EMP_ID = C.EMP_ID
+				AND E.EMP_ROUTE = C.EMP_ROUTE
+			WHERE ALLOTMENT_TIME IS NOT NULL
+		END
+	END
+END
